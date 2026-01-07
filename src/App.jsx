@@ -50,7 +50,7 @@ function App() {
     setMoveTargetPos(null);
   };
 
-  const handleKakaoLogin = () => { /* ... 기존 로그인 코드 ... */ 
+  const handleKakaoLogin = () => { 
       if (!window.Kakao || !window.Kakao.isInitialized()) {
       window.Kakao && window.Kakao.init('828f5dfbdbe7b7cb988a36270ba02040');
     }
@@ -81,37 +81,38 @@ function App() {
     });
   };
 
-  // === 회원가입 완료 핸들러 (App.js 내부) ===
+  // === 회원가입 완료 핸들러 (수정됨: 게스트 모드) ===
   const handleSignupComplete = async (formData) => {
     if (!pendingUser) return;
     try {
-        // 🔥 Firebase로 전송될 데이터 객체
         const newUser = {
-            name: formData.name,            // 입력받은 이름
-            nickname: formData.name,        // 기존 로직 호환성을 위해 닉네임 필드에도 이름 저장
-            studentInfo: formData.studentInfo, // "학부 2학년" 형태의 문자열
-            role: 'member',                 // 정회원 권한 부여
-            remainingStars: 10,             // 기본 별 지급
+            name: formData.name,            
+            nickname: formData.name,        
+            studentInfo: formData.studentInfo, 
+            
+            // 🔥 [수정됨] 가입 시 'guest'(비회원) 상태로 시작!
+            role: 'guest',                 
+            
+            remainingStars: 10,             
             reviewCount: 0,                 
             createdAt: serverTimestamp()
         };
         
-        // 🚀 여기가 바로 Firebase DB에 저장하는 코드입니다!
         await setDoc(doc(db, "users", pendingUser.id), newUser);
         
-        // 로컬 상태 업데이트 (로그인 처리)
         setUser({ id: pendingUser.id, ...newUser });
         setPendingUser(null);
-        alert(`환영합니다, ${formData.name} 회원님! 🚀`);
+        // 안내 메시지도 변경
+        alert(`환영합니다, ${formData.name}님! 가입 승인 대기 중입니다. (현재 비회원 상태)`);
     } catch (e) {
         console.error("가입 실패:", e);
         alert("오류가 발생했습니다.");
     }
   };
 
-  const handleAddPlace = async () => { /* ... 기존 추가 코드 ... */ 
-      if (!user) return alert("로그인이 필요한 기능입니다.");
-    if (user.role !== 'member') return alert("정회원만 가능합니다.");
+  const handleAddPlace = async () => { 
+    if (!user) return alert("로그인이 필요한 기능입니다.");
+    if (user.role !== 'member') return alert("정회원만 가능합니다."); // 여기서 막힘
     if (!newPlaceName) return alert("식당 이름을 입력해주세요.");
 
     try {
@@ -190,7 +191,6 @@ function App() {
              tempMarkerPos={newPlacePos} 
              moveTargetPos={moveTargetPos}
              
-             // 🔥 [여기가 중요] 조건문이 App.js로 왔습니다!
              onMapClick={(data) => { 
                if (isMoveMode) {
                    console.log("이동 모드 클릭:", data);
