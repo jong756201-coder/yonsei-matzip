@@ -66,3 +66,34 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+/* === 모바일 앱 최적화 스타일 === */
+
+/* 1. 터치 시 번쩍이는 하이라이트 제거 (가장 중요) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 2. 텍스트 드래그(선택) 방지: 앱처럼 보이게 함 */
+body {
+  user-select: none;
+  -webkit-user-select: none; /* 크롬/사파리 */
+  -webkit-touch-callout: none; /* 꾹 눌렀을 때 메뉴 뜨는 것 방지 */
+}
+
+/* 3. 입력창(input, textarea)에서는 텍스트 선택 허용 */
+input, textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 4. 스크롤 튕김(Rubber Banding) 방지 & 부드러운 스크롤 */
+body, html {
+  overscroll-behavior-y: none; /* 위아래로 당겼을 때 새로고침/빈공간 방지 */
+  touch-action: manipulation; /* 더블탭 확대 방지 -> 클릭 반응 속도 빨라짐 */
+}
+
+/* 5. 버튼 눌렀을 때 움찔하는 효과 (선택사항: 눌리는 느낌 주기) */
+button:active {
+  transform: scale(0.96);
+  transition: transform 0.1s;
+}

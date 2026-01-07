@@ -3,10 +3,10 @@ import { classifyLocation } from '../utils/locationHelper';
 
 const CATEGORY_STYLES = {
   "한식": { color: "#ff6b6b" }, 
-  "양식": { color: "#ff62faff" },
-  "중식": { color: "#f32626ff" }, 
+  "양식": { color: "#f582f1ff" },
+  "중식": { color: "#fa3434ff" }, 
   "일식": { color: "#dedadaff" }, 
-  "패스트푸드": { color: "#fe5500ff" }, 
+  "패스트푸드": { color: "#9e46fcff" }, 
   "고기": { color: "#ff922b" }, 
   "술집": { color: "#51cf66" }, 
   "카페": { color: "#22b8cf" }, 
@@ -41,13 +41,13 @@ const MapContainer = ({
     mapRef.current = map;
   }, []); 
 
-  // 2. 🔥 [핵심 수정] 클릭 이벤트 (모드 체크 강화)
+  // 2. 클릭 이벤트 (모드 체크 강화)
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
 
     const handleMapClick = (mouseEvent) => {
-      // 🔥 추가 모드도 아니고, 이동 모드도 아니면 -> 여기서 컷!
+      // 추가 모드도 아니고, 이동 모드도 아니면 -> 여기서 컷!
       if (!isAddMode && !isMoveMode) {
         onPlaceClick(null); // (선택된 장소가 있다면) 상세창 닫기
         return; // 좌표 전송 안 함!
@@ -136,6 +136,17 @@ const MapContainer = ({
        moveMarkerInstance.current = marker; 
     }
   }, [moveTargetPos]);
+
+  // 🔥 7. [모바일 최적화] 지도가 다시 보일 때 깨짐/버벅임 방지
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.relayout();
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [places]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
