@@ -12,7 +12,7 @@ import { getAstroRank } from '../utils/rankHelper';
 const DEGREES = ["학부", "석사", "박사"];
 const GRADES = ["1", "2", "3", "4", "5이상"];
 
-const MyPage = ({ user, setUser }) => {
+const MyPage = ({ user, setUser, onLogin }) => {
   // 탭 상태: 'reviews' | 'posts' | 'comments'
   const [activeTab, setActiveTab] = useState('reviews');
   
@@ -139,7 +139,29 @@ const MyPage = ({ user, setUser }) => {
     }
   };
 
-  if (!user) return <div style={{ padding:'40px', textAlign:'center', color:'#888' }}>로그인이 필요합니다.</div>;
+  if (!user) {
+    return (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: '#000', color: '#666', gap: '16px' }}>
+            <div style={{ padding: '30px', backgroundColor: '#1a1a1a', borderRadius: '20px', textAlign: 'center', border: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                <User size={48} style={{ color: '#888' }} />
+                <div>
+                    <h3 style={{ color: 'white', fontSize: '18px', margin: '0 0 8px 0' }}>로그인이 필요합니다</h3>
+                    <p style={{ fontSize: '14px', margin: 0 }}>내 정보를 확인하려면 로그인해주세요.</p>
+                </div>
+                <button 
+                    onClick={onLogin}
+                    style={{ 
+                        backgroundColor: '#FEE500', color: '#000', border: 'none', 
+                        borderRadius: '8px', padding: '12px 24px', fontSize: '14px', 
+                        fontWeight: 'bold', cursor: 'pointer' 
+                    }}
+                >
+                    카카오 로그인
+                </button>
+            </div>
+        </div>
+    );
+  }
 
   // 등급 계산
   const rank = getAstroRank(user.reviewCount || 0);

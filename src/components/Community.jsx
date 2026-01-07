@@ -5,16 +5,17 @@ import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, increment
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getAstroRank } from '../utils/rankHelper';
 
-// 🔥 [수정됨] 게시판 종류에 '버그제보' 추가
+// 🔥 [수정됨] 게시판 순서 변경 및 신메뉴리뷰 추가, 버그제보 삭제
 const BOARDS = [
-  { id: 'free', name: '🗣 자유게시판' },
+  { id: 'newmenu', name: '🔥 신메뉴리뷰' }, // 맨 앞으로 배치
   { id: 'restaurant', name: '🍱 맛집공유' },
+  { id: 'free', name: '🗣 자유게시판' },     // 뒤로 이동
   { id: 'jokbo', name: '📄 족보게시판' },
-  { id: 'bug', name: '🐞 버그제보' }, // NEW!
 ];
 
-const Community = ({ user }) => {
-  const [activeBoard, setActiveBoard] = useState('free');
+const Community = ({ user, onLogin }) => {
+  // 🔥 기본 탭을 'newmenu'(신메뉴리뷰)로 설정
+  const [activeBoard, setActiveBoard] = useState('newmenu');
   const [view, setView] = useState('list'); 
   const [posts, setPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null); 
@@ -26,19 +27,19 @@ const Community = ({ user }) => {
 
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [showAuthWarning, setShowAuthWarning] = useState(false); // 🔥 [NEW] 권한 경고 모달 상태
 
-  // 정회원 체크
-  if (!user || user.role !== 'member') {
-      return (
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: '#000', color: '#666', gap: '16px' }}>
-              <div style={{ padding: '24px', backgroundColor: '#1a1a1a', borderRadius: '20px', textAlign: 'center', border: '1px solid #333' }}>
-                  <Lock size={48} style={{ marginBottom: '16px', color: '#c92a2a' }} />
-                  <h3 style={{ color: 'white', fontSize: '18px', marginBottom: '8px' }}>정회원 전용 구역</h3>
-                  <p style={{ fontSize: '14px' }}>로그인 후 이용해주세요.</p>
-              </div>
-          </div>
-      );
-  }
+  // 권한 체크 함수
+  const checkMemberAuth = () => {
+      if (!user || user.role !== 'member') {
+          setShowAuthWarning(true);
+          return false;
+      }
+      return true;
+  };
+
+  // 🔥 [삭제됨] 기존의 전체 차단 로직 제거
+  // if (!user || user.role !== 'member') { ... }
 
   // 1. 게시글 목록 구독 (JS 정렬)
   useEffect(() => {
@@ -232,8 +233,38 @@ const Community = ({ user }) => {
 
   if (view === 'list') {
     return (
-      <div style={{ padding: '20px', paddingBottom: '80px', height: '100%', backgroundColor: '#000', color: 'white', overflowY: 'auto' }}>
+      <div style={{ padding: '20px', paddingBottom: '80px', height: '100%', backgroundColor: '#000', color: 'white', overflowY: 'auto', position: 'relative' }}>
         
+        {/* 🔥 [NEW] 권한 경고 모달 */}
+        {showAuthWarning && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+                <div style={{ backgroundColor: '#1a1a1a', width: '100%', maxWidth: '300px', borderRadius: '20px', padding: '24px', border: '1px solid #333', textAlign: 'center', position: 'relative' }}>
+                    <button onClick={() => setShowAuthWarning(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}><X size={20}/></button>
+                    <Lock size={40} style={{ color: '#c92a2a', marginBottom: '16px' }} />
+                    <h3 style={{ color: 'white', fontSize: '18px', margin: '0 0 8px 0' }}>정회원 전용 기능</h3>
+                    <p style={{ fontSize: '14px', color: '#aaa', marginBottom: '20px' }}>게시글을 보거나 작성하려면<br/>로그인이 필요합니다.</p>
+                    
+                    {!user && (
+                        <button 
+                            onClick={onLogin}
+                            style={{ 
+                                backgroundColor: '#FEE500', color: '#000', border: 'none', 
+                                borderRadius: '8px', padding: '10px 20px', fontSize: '14px', 
+                                fontWeight: 'bold', cursor: 'pointer', width: '100%'
+                            }}
+                        >
+                            카카오 로그인
+                        </button>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* 🔥 [NEW] 상단 제목 추가 */}
+        <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+             <MessageSquare size={24} /> 커뮤니티
+        </h2>
+
         {/* 게시판 탭 */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto' }} className="hide-scrollbar">
           <style>{` .hide-scrollbar::-webkit-scrollbar { display: none; } `}</style>
@@ -247,7 +278,7 @@ const Community = ({ user }) => {
 
         {/* 글쓰기 버튼 */}
         <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'flex-end' }}>
-             <button onClick={() => setView('write')} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#222', padding: '8px 12px', borderRadius: '8px', border: '1px solid #333', color: '#ccc', cursor: 'pointer' }}>
+             <button onClick={() => { if (checkMemberAuth()) setView('write'); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#222', padding: '8px 12px', borderRadius: '8px', border: '1px solid #333', color: '#ccc', cursor: 'pointer' }}>
                  <Edit3 size={16} /> 새 글 쓰기
              </button>
         </div>
@@ -259,7 +290,7 @@ const Community = ({ user }) => {
                 </div>
             ) : (
                 posts.map(post => (
-                    <div key={post.id} onClick={() => { setSelectedPost(post); setView('detail'); }}
+                    <div key={post.id} onClick={() => { if (checkMemberAuth()) { setSelectedPost(post); setView('detail'); } }}
                          style={{ padding: '16px 0', borderBottom: '1px solid #222', cursor: 'pointer' }}>
                         <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '6px' }}>{post.title}</div>
                         <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.content}</div>

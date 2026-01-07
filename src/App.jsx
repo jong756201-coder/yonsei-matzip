@@ -24,11 +24,14 @@ function App() {
   const [newPlaceCategory, setNewPlaceCategory] = useState("한식");
   const [newPlaceLocation, setNewPlaceLocation] = useState("정문");
   const [isStudyFriendly, setIsStudyFriendly] = useState(false);
+  const [isFranchise, setIsFranchise] = useState(false); // 📍 [NEW] 프랜차이즈 여부 상태
   
   const [isAddMode, setIsAddMode] = useState(false);
   const [isMoveMode, setIsMoveMode] = useState(false);
   const [placeToMove, setPlaceToMove] = useState(null);
   const [moveTargetPos, setMoveTargetPos] = useState(null);
+  const [mapFocus, setMapFocus] = useState(null); // 📍 [NEW] 지도 이동 명령을 관리하는 상태
+  const [isSheetVisible, setIsSheetVisible] = useState(true); // 📍 [NEW] 시트 표시 여부 (위치보기 시 숨김)
 
   const { stats, reviews, submitReview, deleteReview } = useReviewLogic(selectedPlace, user, setUser);
 
@@ -90,41 +93,50 @@ function App() {
     initKakao();
 
     // C. 로그인 시도
-    window.Kakao.Auth.login({
-      success: (authObj) => {
-        window.Kakao.API.request({
-          url: '/v2/user/me',
-          success: async (res) => {
-            const kakaoId = res.id.toString();
-            const userRef = doc(db, "users", kakaoId);
-            const userSnap = await getDoc(userRef);
+    try {
+        window.Kakao.Auth.login({
+          success: (authObj) => {
+            window.Kakao.API.request({
+              url: '/v2/user/me',
+              success: async (res) => {
+                const kakaoId = res.id.toString();
+                const userRef = doc(db, "users", kakaoId);
+                const userSnap = await getDoc(userRef);
 
-            if (userSnap.exists()) {
-              const userData = userSnap.data();
-              if (userData.remainingStars === undefined) {
-                  await updateDoc(userRef, { remainingStars: 10 });
-                  userData.remainingStars = 10;
-              }
-              setUser({ id: kakaoId, ...userData });
-              localStorage.setItem('userId', kakaoId); 
-            } else {
-              setPendingUser({ id: kakaoId, kakaoNickname: res.properties.nickname });
-            }
+                if (userSnap.exists()) {
+                  const userData = userSnap.data();
+                  if (userData.remainingStars === undefined) {
+                      await updateDoc(userRef, { remainingStars: 10 });
+                      userData.remainingStars = 10;
+                  }
+                  setUser({ id: kakaoId, ...userData });
+                  localStorage.setItem('userId', kakaoId); 
+                } else {
+                  setPendingUser({ id: kakaoId, kakaoNickname: res.properties.nickname });
+                }
+              },
+              fail: (err) => {
+                console.error("사용자 정보 요청 실패:", err);
+                alert("정보를 불러오는데 실패했습니다.");
+              },
+            });
           },
           fail: (err) => {
-            console.error("사용자 정보 요청 실패:", err);
-            alert("정보를 불러오는데 실패했습니다.");
+            console.error("로그인 실패:", err);
+            const errStr = JSON.stringify(err);
+            if (errStr.includes("limit exceeded")) {
+               alert("⛔️ 잠시 로그인 제한이 걸렸습니다. 1시간 뒤에 다시 시도해주세요.");
+            } else if (errStr.includes("popup")) {
+               alert("팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.");
+            } else {
+               alert("로그인에 실패했습니다. 다시 시도해주세요.");
+            }
           },
         });
-      },
-      fail: (err) => {
-        console.error("로그인 실패:", err);
-        // 토큰 에러 발생 시 사용자에게 인지시킴
-        if (JSON.stringify(err).includes("limit exceeded")) {
-           alert("⛔️ 잠시 로그인 제한이 걸렸습니다. 1시간 뒤에 다시 시도해주세요.");
-        }
-      },
-    });
+    } catch (e) {
+        console.error("SDK 호출 오류:", e);
+        alert("카카오 로그인 오류가 발생했습니다.");
+    }
   };
 
   const handleSignupComplete = async (formData) => {
@@ -168,6 +180,7 @@ function App() {
         creatorName: user.nickname || user.name, 
         totalHonorStars: 0,
         isStudyFriendly: newPlaceCategory === '카페' ? isStudyFriendly : false, 
+        isFranchise: isFranchise, // 📍 [NEW]
         createdAt: serverTimestamp()
       });
       alert(`✅ 등록 완료!`);
@@ -175,6 +188,7 @@ function App() {
       setNewPlacePos(null); 
       setNewPlaceName("");
       setIsStudyFriendly(false); 
+      setIsFranchise(false); // 초기화
     } catch (error) { console.error(error); alert("오류 발생"); }
   };
 
@@ -195,6 +209,8 @@ function App() {
               const placeRef = doc(db, "places", placeToMove.id);
               await updateDoc(placeRef, { lat: moveTargetPos.lat, lng: moveTargetPos.lng });
               alert("위치가 수정되었습니다! 🛰️");
+              // 이동 후 지도 중심도 변경
+              setMapFocus({ lat: moveTargetPos.lat, lng: moveTargetPos.lng, level: 1, timestamp: Date.now() });
           } catch (e) {
               console.error(e);
               alert("위치 수정 실패");
@@ -204,6 +220,30 @@ function App() {
               setMoveTargetPos(null);
           }
       }
+  };
+
+  // 🔥 [리팩토링] 장소 선택 핸들러 (줌 필요 여부 선택 가능)
+  const handlePlaceSelect = (place, shouldZoom = false) => {
+    setSelectedPlace(place);
+    if (shouldZoom) {
+      setActiveTab('map');
+      setMapFocus({ lat: place.lat, lng: place.lng, level: 1, timestamp: Date.now() });
+      setIsSheetVisible(false); // 지도로 이동 시 시트는 잠시 숨김 (핀은 유지됨)
+    } else {
+      setIsSheetVisible(true); // 핀 클릭 등 일반 선택 시 시트 표시
+    }
+  };
+
+  // 🔥 [NEW] 지도 빈 곳 클릭 시 시트 다시 닫기 (완전 해제)
+  const handleMapBackgroundClick = () => {
+     if (isSheetVisible) {
+         setSelectedPlace(null);
+     } else {
+         // 시트가 숨겨져 있던 상태라면(위치보기 모드), 빈 곳 클릭 시 선택 해제보다는 시트를 다시 띄우는 게 나을 수도 있지만,
+         // 보통 빈 곳 클릭은 선택 해제를 의미하므로 null 처리
+         setSelectedPlace(null);
+         setIsSheetVisible(true);
+     }
   };
 
   const toggleAddMode = () => {
@@ -236,19 +276,21 @@ function App() {
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#000', color: 'white', fontFamily: 'sans-serif', overflow: 'hidden' }}>
       
       {pendingUser && <SignupModal kakaoProfile={pendingUser} onComplete={handleSignupComplete} />}
-      {activeTab === 'map' && <Header user={user} onLogin={handleKakaoLogin} />}
+      {activeTab === 'map' && <Header user={user} onLogin={handleKakaoLogin} places={places} onPlaceSelect={(place) => handlePlaceSelect(place, true)} />}
 
       <div style={{ flex: 1, position: 'relative', width: '100%', overflow: 'hidden' }}>
         
         <div style={{ width: '100%', height: '100%', display: activeTab === 'map' ? 'block' : 'none' }}>
            <MapContainer 
              places={places} 
+             selectedPlace={selectedPlace}
              isAddMode={isAddMode}
              isMoveMode={isMoveMode}
-             onPlaceClick={setSelectedPlace}
+             onPlaceClick={(place) => handlePlaceSelect(place, false)} // 마커 클릭 시에는 줌 하지 않음
+             mapFocus={mapFocus} // 📍 [NEW] 지도 이동 명령 전달
              tempMarkerPos={newPlacePos} 
              moveTargetPos={moveTargetPos}
-             onMapClick={(data) => { 
+             onMapClick={(data) => {  
                if (isMoveMode) {
                    setMoveTargetPos({ lat: data.lat, lng: data.lng });
                } else if (isAddMode) {
@@ -256,21 +298,21 @@ function App() {
                    setNewPlaceLocation(data.detectedZone);
                    setSelectedPlace(null);
                } else {
-                   setSelectedPlace(null);
+                   handleMapBackgroundClick(); // 📍 [수정] 빈 곳 클릭 핸들러 연결
                }
              }}
            />
         </div>
         
         {isAddMode && activeTab === 'map' && !newPlacePos && (
-            <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(59, 130, 246, 0.9)', padding: '10px 20px', borderRadius: '20px', zIndex: 100, boxShadow: '0 4px 10px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ position: 'absolute', top: '80px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(59, 130, 246, 0.9)', padding: '10px 20px', borderRadius: '20px', zIndex: 100, boxShadow: '0 4px 10px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '14px', fontWeight: 'bold' }}>📍 등록할 위치를 선택하세요</span>
                 <button onClick={toggleAddMode} style={{ background: 'none', border: 'none', color: 'white', display: 'flex' }}><X size={16}/></button>
             </div>
         )}
 
         {isMoveMode && activeTab === 'map' && (
-            <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', zIndex: 100 }}>
+            <div style={{ position: 'absolute', top: '80px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', zIndex: 100 }}>
                 <div style={{ backgroundColor: 'rgba(255, 171, 0, 0.95)', padding: '10px 20px', borderRadius: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'black' }}>
                         {moveTargetPos ? "이 위치로 변경할까요?" : "새로운 위치를 찍어주세요"}
@@ -292,16 +334,36 @@ function App() {
         )}
 
         {newPlacePos && activeTab === 'map' && (
-           <AddPlaceModal user={user} newPlaceName={newPlaceName} setNewPlaceName={setNewPlaceName} newPlaceCategory={newPlaceCategory} setNewPlaceCategory={setNewPlaceCategory} newPlaceLocation={newPlaceLocation} setNewPlaceLocation={setNewPlaceLocation} isStudyFriendly={isStudyFriendly} setIsStudyFriendly={setIsStudyFriendly} onClose={() => { setNewPlacePos(null); setIsAddMode(false); }} onAdd={handleAddPlace} onLogin={handleKakaoLogin} />
+           <AddPlaceModal 
+             user={user} 
+             newPlaceName={newPlaceName} setNewPlaceName={setNewPlaceName} 
+             newPlaceCategory={newPlaceCategory} setNewPlaceCategory={setNewPlaceCategory} 
+             newPlaceLocation={newPlaceLocation} setNewPlaceLocation={setNewPlaceLocation} 
+             isStudyFriendly={isStudyFriendly} setIsStudyFriendly={setIsStudyFriendly} 
+             isFranchise={isFranchise} setIsFranchise={setIsFranchise} // 📍 [NEW]
+             onClose={() => { setNewPlacePos(null); setIsAddMode(false); }} 
+             onAdd={handleAddPlace} 
+             onLogin={handleKakaoLogin} 
+           />
         )}
 
-        {selectedPlace && !newPlacePos && (activeTab === 'map' || activeTab === 'find') && (
-            <PlaceDetailSheet place={selectedPlace} user={user} stats={stats} reviews={reviews} onClose={() => setSelectedPlace(null)} onMoveStart={handleStartMove} onReviewSubmit={submitReview} onReviewDelete={deleteReview} />
+        {selectedPlace && !newPlacePos && isSheetVisible && (activeTab === 'map' || activeTab === 'find') && (
+            <PlaceDetailSheet 
+              place={selectedPlace} 
+              user={user} 
+              stats={stats} 
+              reviews={reviews} 
+              onClose={() => setSelectedPlace(null)} 
+              onMoveStart={handleStartMove} 
+              onReviewSubmit={submitReview} 
+              onReviewDelete={deleteReview} 
+              onShowMap={() => handlePlaceSelect(selectedPlace, true)} // 📍 [NEW] 위치 보기 클릭 시 지도로 이동 및 줌
+            />
         )}
 
-        {activeTab === 'find' && <RestaurantFinder places={places} onPlaceClick={setSelectedPlace} />}
-        {activeTab === 'community' && <Community user={user} />}
-        {activeTab === 'mypage' && <MyPage user={user} setUser={setUser} />}
+        {activeTab === 'find' && <RestaurantFinder places={places} onPlaceClick={(place) => handlePlaceSelect(place, false)} />}
+        {activeTab === 'community' && <Community user={user} onLogin={handleKakaoLogin} />}
+        {activeTab === 'mypage' && <MyPage user={user} setUser={setUser} onLogin={handleKakaoLogin} />}
       </div>
 
       <div style={{ height: '70px', flexShrink: 0, display: 'flex', justifyContent: 'space-around', alignItems: 'center', backgroundColor: '#000', borderTop: '1px solid #222', paddingBottom: '10px', zIndex: 200 }}>

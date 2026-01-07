@@ -1,131 +1,87 @@
 import React, { useState } from 'react';
 
-const SignupModal = ({ kakaoProfile, onComplete }) => {
-  const [realName, setRealName] = useState("");
-  const [nickname, setNickname] = useState(""); 
-  
-  // 초기값 설정
-  const [degree, setDegree] = useState("학부"); 
-  const [grade, setGrade] = useState("1");      
+const DEGREES = ["학부", "석사", "박사"];
+const GRADES = ["1", "2", "3", "4", "5"];
 
-  // 선택지 배열
-  const DEGREES = ["학부", "석사", "박사"];
-  const GRADES = ["1", "2", "3", "4", "5이상"];
+const SignupModal = ({ kakaoProfile, onComplete }) => {
+  // 카카오에서 가져온 닉네임을 기본 이름으로 설정 (수정 가능)
+  const [name, setName] = useState(kakaoProfile.kakaoNickname || "");
+  const [degree, setDegree] = useState("학부");
+  const [grade, setGrade] = useState("1");
 
   const handleSubmit = () => {
-    if (!realName.trim()) {
-      alert("이름을 입력해주세요.");
-      return;
-    }
-
-    const finalNickname = nickname.trim() ? nickname.trim() : realName.trim();
-    const studentInfoStr = `${degree} ${grade}학년`;
-
-    onComplete({
-      name: realName,
-      nickname: finalNickname,
-      studentInfo: studentInfoStr
-    });
+    if (!name.trim()) return alert("이름을 입력해주세요.");
+    
+    // 데이터 정리해서 부모(App.js)로 전달
+    const finalData = {
+        name: name,
+        // 닉네임 필드에도 이름을 넣어서 기존 로직과 호환성 유지
+        nickname: name, 
+        studentInfo: `${degree} ${grade}학년`
+    };
+    onComplete(finalData);
   };
 
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <div style={{ width: '85%', maxWidth: '340px', backgroundColor: '#1a1a1a', padding: '24px', borderRadius: '16px', border: '1px solid #333', boxShadow: '0 10px 40px rgba(0,0,0,1)' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+      <div style={{ backgroundColor: '#1a1a1a', width: '100%', maxWidth: '340px', padding: '30px', borderRadius: '24px', border: '1px solid #333', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
         
-        <h2 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', textAlign: 'center' }}>🚀 신규 대원 등록</h2>
-        <p style={{ color: '#888', fontSize: '13px', marginBottom: '24px', textAlign: 'center' }}>
-            천문 맛집지도에 오신 것을 환영합니다.<br/>
-            기본 정보를 입력해주세요.
+        <h2 style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>🚀 대원 등록</h2>
+        <p style={{ color: '#888', fontSize: '13px', marginBottom: '24px' }}>
+            정회원 등록을 위해 정보를 입력해주세요.<br/>
+            입력된 정보는 커뮤니티 활동에 사용됩니다.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* 1. 이름 */}
+            {/* 1. 이름 입력 */}
             <div>
-                <label style={{ color: '#ccc', fontSize: '12px', display: 'block', marginBottom: '8px' }}>이름 (실명)</label>
+                <label style={{ color: '#ccc', fontSize: '12px', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>이름 (실명 권장)</label>
                 <input 
                     type="text" 
-                    placeholder="홍길동"
-                    value={realName}
-                    onChange={(e) => setRealName(e.target.value)}
-                    style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#333', border: '1px solid #444', color: 'white', outline: 'none', fontSize: '15px' }}
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="이름을 입력하세요"
+                    style={{ width: '100%', padding: '12px', backgroundColor: '#252525', border: '1px solid #444', borderRadius: '8px', color: 'white', outline: 'none', fontSize: '15px' }}
                 />
             </div>
 
-            {/* 2. 닉네임 */}
+            {/* 2. 학적 정보 선택 */}
             <div>
-                <label style={{ color: '#ccc', fontSize: '12px', display: 'block', marginBottom: '8px' }}>닉네임 (선택)</label>
-                <input 
-                    type="text" 
-                    placeholder={realName ? `${realName}` : "미입력 시 이름 사용"}
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#333', border: '1px solid #444', color: 'white', outline: 'none', fontSize: '15px' }}
-                />
-            </div>
-
-            {/* 3. 학적 정보 (바 형태 선택) */}
-            <div>
-                <label style={{ color: '#ccc', fontSize: '12px', display: 'block', marginBottom: '8px' }}>과정 선택</label>
-                <div style={{ display: 'flex', gap: '8px', backgroundColor: '#222', padding: '4px', borderRadius: '12px' }}>
-                    {DEGREES.map((d) => (
-                        <button
-                            key={d}
-                            onClick={() => setDegree(d)}
-                            style={{
-                                flex: 1,
-                                padding: '10px 0',
-                                borderRadius: '8px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                fontWeight: degree === d ? 'bold' : 'normal',
-                                backgroundColor: degree === d ? '#3b82f6' : 'transparent',
-                                color: degree === d ? 'white' : '#888',
-                                transition: 'all 0.2s'
-                            }}
-                        >
+                <label style={{ color: '#ccc', fontSize: '12px', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>소속 과정</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    {DEGREES.map(d => (
+                        <button key={d} onClick={() => setDegree(d)}
+                            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', 
+                            borderColor: degree === d ? '#3b82f6' : '#444', backgroundColor: degree === d ? 'rgba(59, 130, 246, 0.2)' : '#252525', 
+                            color: degree === d ? '#3b82f6' : '#888', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
                             {d}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* 4. 학년 선택 (바 형태 선택) */}
+            {/* 3. 학년 선택 */}
             <div>
-                <label style={{ color: '#ccc', fontSize: '12px', display: 'block', marginBottom: '8px' }}>학년 선택</label>
-                <div style={{ display: 'flex', gap: '6px', backgroundColor: '#222', padding: '4px', borderRadius: '12px' }}>
-                    {GRADES.map((g) => (
-                        <button
-                            key={g}
-                            onClick={() => setGrade(g)}
-                            style={{
-                                flex: 1,
-                                padding: '10px 0',
-                                borderRadius: '8px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                fontWeight: grade === g ? 'bold' : 'normal',
-                                backgroundColor: grade === g ? '#3b82f6' : 'transparent',
-                                color: grade === g ? 'white' : '#888',
-                                transition: 'all 0.2s'
-                            }}
-                        >
+                <label style={{ color: '#ccc', fontSize: '12px', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>학년</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                    {GRADES.map(g => (
+                        <button key={g} onClick={() => setGrade(g)}
+                            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid', 
+                            borderColor: grade === g ? '#3b82f6' : '#444', backgroundColor: grade === g ? 'rgba(59, 130, 246, 0.2)' : '#252525', 
+                            color: grade === g ? '#3b82f6' : '#888', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
                             {g}
                         </button>
                     ))}
                 </div>
             </div>
 
-            <button 
-                onClick={handleSubmit}
-                style={{ marginTop: '10px', width: '100%', padding: '16px', borderRadius: '12px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
-            >
-                회원가입 완료
-            </button>
-
         </div>
+
+        <button onClick={handleSubmit} style={{ marginTop: '30px', width: '100%', padding: '14px', borderRadius: '12px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)' }}>
+            등록 완료
+        </button>
+
       </div>
     </div>
   );

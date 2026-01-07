@@ -8,6 +8,7 @@ const AddPlaceModal = ({
   newPlaceCategory, setNewPlaceCategory,
   newPlaceLocation, setNewPlaceLocation,
   isStudyFriendly, setIsStudyFriendly,
+  isFranchise, setIsFranchise, // 📍 [NEW]
   onClose, 
   onAdd,
   onLogin 
@@ -47,6 +48,7 @@ const AddPlaceModal = ({
                     <option value="양식">🍝 양식</option>
                     <option value="중식">🥟 중식</option>
                     <option value="일식">🍣 일식</option>
+                    <option value="분식">🍢 분식</option> {/* 📍 [NEW] */}
                     <option value="패스트푸드">🍔 패스트푸드</option>
                     <option value="고기">🥩 고기</option>
                     <option value="술집">🍻 술집</option>
@@ -79,6 +81,14 @@ const AddPlaceModal = ({
                     <span style={{ fontSize: '14px', color: '#ddd' }}>📚 카공하기 좋은 곳인가요?</span>
                 </div>
             )}
+
+            {/* 🔥 [NEW] 프랜차이즈 체크 */}
+            <div onClick={() => setIsFranchise(!isFranchise)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', backgroundColor: '#333', borderRadius: '8px', cursor: 'pointer' }}>
+                <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: '2px solid #555', backgroundColor: isFranchise ? '#3b82f6' : 'transparent', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    {isFranchise && <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold' }}>✓</span>}
+                </div>
+                <span style={{ fontSize: '14px', color: '#ddd' }}>🏢 프랜차이즈인가요?</span>
+            </div>
 
             <button onClick={onAdd} style={{ marginTop: '10px', width: '100%', padding: '16px', borderRadius: '8px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontWeight: 'bold' }}>등록하기</button>
           </div>
