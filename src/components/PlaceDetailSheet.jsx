@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, MessageSquare, MapPin } from 'lucide-react'; // 🔥 MapPin 추가
+import { X, Trash2, MessageSquare, MapPin, CheckCircle } from 'lucide-react'; 
 import { db } from '../firebase'; 
 import { doc, getDoc } from 'firebase/firestore'; 
 import ReviewForm from './ReviewForm'; 
 import { getAstroRank } from '../utils/rankHelper'; 
 
-// 🟢 개별 리뷰 아이템 컴포넌트 (작성자 정보 실시간 조회)
+// 🟢 개별 리뷰 아이템 컴포넌트
 const ReviewItem = ({ review, currentUser, onDelete }) => {
   const [authorRank, setAuthorRank] = useState(null);
 
@@ -14,16 +14,13 @@ const ReviewItem = ({ review, currentUser, onDelete }) => {
       try {
         const userRef = doc(db, "users", review.userId);
         const userSnap = await getDoc(userRef);
-
         if (userSnap.exists()) {
           const userData = userSnap.data();
           setAuthorRank(getAstroRank(userData.reviewCount || 0));
         } else {
           setAuthorRank(getAstroRank(0));
         }
-      } catch (e) {
-        console.error("작성자 정보 조회 실패", e);
-      }
+      } catch (e) { console.error(e); }
     };
     fetchAuthorInfo();
   }, [review.userId]);
@@ -35,10 +32,7 @@ const ReviewItem = ({ review, currentUser, onDelete }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {/* 작성자 이름 */}
                     <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{review.userName}</span>
-                    
-                    {/* 작성자 등급 뱃지 */}
                     {authorRank && (
                         <span style={{ 
                             fontSize: '10px', fontWeight: 'bold', 
@@ -54,22 +48,14 @@ const ReviewItem = ({ review, currentUser, onDelete }) => {
                     {review.createdAt?.seconds ? new Date(review.createdAt.seconds * 1000).toLocaleDateString() : '방금 전'}
                 </span>
             </div>
-
-            {/* 리뷰 삭제 버튼 (내 글일 때만) */}
+            {/* 내 글일 때만 삭제 버튼 표시 */}
             {currentUser && currentUser.id === review.userId && (
-                <button 
-                    onClick={() => onDelete(review)}
-                    style={{ background: 'none', border: 'none', color: '#ff4d4d', cursor: 'pointer', padding: '4px' }}
-                >
+                <button onClick={() => onDelete(review)} style={{ background: 'none', border: 'none', color: '#ff4d4d', cursor: 'pointer', padding: '4px' }}>
                     <Trash2 size={16} />
                 </button>
             )}
         </div>
-
-        <div style={{ fontSize: '14px', color: '#ddd', marginBottom: '10px', lineHeight: '1.4' }}>
-            {review.reviewText}
-        </div>
-
+        <div style={{ fontSize: '14px', color: '#ddd', marginBottom: '10px', lineHeight: '1.4' }}>{review.reviewText}</div>
         <div style={{ display: 'flex', gap: '8px', fontSize: '11px', backgroundColor: '#333', padding: '6px 10px', borderRadius: '6px', width: 'fit-content' }}>
             <span style={{ color: '#FFD700' }}>😋 맛 {review.tasteRating}</span>
             <span style={{ width: '1px', height: '100%', backgroundColor: '#555' }}></span>
@@ -85,11 +71,14 @@ const ReviewItem = ({ review, currentUser, onDelete }) => {
   );
 };
 
-// 🔴 [메인] PlaceDetailSheet 컴포넌트
+// 🔴 메인 컴포넌트: 상세 정보 시트
 const PlaceDetailSheet = ({ 
   place, user, stats, reviews, onClose, onMoveStart, onReviewSubmit, onReviewDelete 
 }) => {
   
+  // 🔥 [핵심 로직] 현재 식당 리뷰 목록 중 '내 아이디'로 쓴 글이 있는지 확인
+  const existingReview = user ? reviews?.find(r => r.userId === user.id) : null;
+
   return (
     <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#1a1a1a', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '0', zIndex: 100, borderTop: '1px solid #333', boxShadow: '0 -4px 30px rgba(0,0,0,0.8)', maxHeight: '80%', overflowY: 'auto' }}>
       
@@ -97,7 +86,7 @@ const PlaceDetailSheet = ({
       <div style={{ padding: '24px 24px 10px' }}>
         <div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', gap: '12px' }}>
           
-          {/* 🔥 [변경] 삭제 버튼 제거 -> 위치 이동 버튼으로 교체 */}
+          {/* 정회원만 위치 이동 가능 */}
           {user && user.role === 'member' && (
             <button 
                 onClick={() => onMoveStart(place)} 
@@ -133,10 +122,19 @@ const PlaceDetailSheet = ({
             </div>
         </div>
 
-        {/* 리뷰 입력 폼 */}
+        {/* 리뷰 입력 폼 (조건부 렌더링) */}
         {user && user.role === 'member' ? (
-            <ReviewForm user={user} onSubmit={onReviewSubmit} />
+            // 🔥 [수정됨] 이미 쓴 리뷰가 있으면 폼 대신 안내 메시지 표시
+            existingReview ? (
+                <div style={{ padding: '20px', textAlign: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', marginBottom: '24px', border: '1px solid #3b82f6', color: '#3b82f6', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <CheckCircle size={18} />
+                    이미 소중한 리뷰를 남기셨습니다!
+                </div>
+            ) : (
+                <ReviewForm user={user} onSubmit={onReviewSubmit} />
+            )
         ) : (
+            // 로그인 안 했거나 게스트인 경우
             <div style={{ padding: '20px', textAlign: 'center', backgroundColor: '#222', borderRadius: '12px', marginBottom: '24px', border: '1px dashed #444' }}>
                 <p style={{ color: '#888', fontSize: '13px', margin: 0 }}>
                     {user ? "🚫 정회원만 평가를 남길 수 있습니다." : "🔒 로그인하면 리뷰를 남길 수 있습니다."}
