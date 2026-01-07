@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Plus, X, Map as MapIcon, User, MessageCircle, MapPin, Check } from 'lucide-react'; 
+import { Search, Plus, X, Map as MapIcon, User, MessageCircle, Check } from 'lucide-react'; 
 import { db } from './firebase'; 
 import { doc, getDoc, setDoc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore'; 
 
@@ -25,7 +25,6 @@ function App() {
   const [newPlaceLocation, setNewPlaceLocation] = useState("정문");
   const [isStudyFriendly, setIsStudyFriendly] = useState(false);
   
-  // 모드 상태
   const [isAddMode, setIsAddMode] = useState(false);
   const [isMoveMode, setIsMoveMode] = useState(false);
   const [placeToMove, setPlaceToMove] = useState(null);
@@ -33,29 +32,66 @@ function App() {
 
   const { stats, reviews, submitReview, deleteReview } = useReviewLogic(selectedPlace, user, setUser);
 
-  const toggleAddMode = () => {
-    setIsAddMode(!isAddMode);
-    setNewPlacePos(null);
-    setSelectedPlace(null);
-    setIsMoveMode(false);
-    setMoveTargetPos(null);
-  };
+  // 🔑 카카오 키 상수 선언 (실수 방지)
+  const KAKAO_KEY = '828f5dfbdbe7b7cb988a36270ba02040';
 
-  const handleTabChange = (tabName) => {
-    setActiveTab(tabName);
-    setSelectedPlace(null);
-    setIsAddMode(false);
-    setNewPlacePos(null);
-    setIsMoveMode(false);
-    setMoveTargetPos(null);
-  };
-
-  const handleKakaoLogin = () => { 
-      if (!window.Kakao || !window.Kakao.isInitialized()) {
-      window.Kakao && window.Kakao.init('828f5dfbdbe7b7cb988a36270ba02040');
+  // 🛡️ 안전한 초기화 함수 (이미 되어있으면 건너뜀)
+  const initKakao = () => {
+    if (window.Kakao && !window.Kakao.isInitialized()) {
+      window.Kakao.init(KAKAO_KEY);
+      console.log("Kakao Initialized ✅");
     }
+  };
+
+  // 1. 앱 시작 시: 카카오 SDK 로딩 대기 및 자동 로그인
+  useEffect(() => {
+    // 0.5초 간격으로 카카오 스크립트가 로드됐는지 체크 (네트워크가 느릴 경우 대비)
+    const waitForKakao = setInterval(() => {
+      if (window.Kakao) {
+        initKakao();
+        clearInterval(waitForKakao); // 로드되면 타이머 종료
+      }
+    }, 500);
+
+    // 자동 로그인 로직
+    const checkLoginStatus = async () => {
+      const savedUserId = localStorage.getItem('userId');
+      if (savedUserId) {
+        try {
+          const userRef = doc(db, "users", savedUserId);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            setUser({ id: savedUserId, ...userSnap.data() });
+          } else {
+            localStorage.removeItem('userId');
+          }
+        } catch (e) {
+          console.error("자동 로그인 확인 중 오류:", e);
+        }
+      }
+    };
+    checkLoginStatus();
+
+    // 5초 뒤에도 못 찾으면 타이머 강제 종료 (메모리 누수 방지)
+    setTimeout(() => clearInterval(waitForKakao), 5000);
+
+    return () => clearInterval(waitForKakao);
+  }, []);
+
+  // 2. 로그인 버튼 클릭 핸들러
+  const handleKakaoLogin = () => {
+    // A. 스크립트 로드 확인
+    if (!window.Kakao) {
+      alert("카카오 기능이 아직 로드되지 않았습니다. 잠시 후 다시 시도하거나 새로고침 해주세요.");
+      return;
+    }
+    
+    // B. 초기화 재확인 (안전장치)
+    initKakao();
+
+    // C. 로그인 시도
     window.Kakao.Auth.login({
-      success: async (authObj) => {
+      success: (authObj) => {
         window.Kakao.API.request({
           url: '/v2/user/me',
           success: async (res) => {
@@ -70,18 +106,27 @@ function App() {
                   userData.remainingStars = 10;
               }
               setUser({ id: kakaoId, ...userData });
+              localStorage.setItem('userId', kakaoId); 
             } else {
               setPendingUser({ id: kakaoId, kakaoNickname: res.properties.nickname });
             }
           },
-          fail: (err) => console.error(err),
+          fail: (err) => {
+            console.error("사용자 정보 요청 실패:", err);
+            alert("정보를 불러오는데 실패했습니다.");
+          },
         });
       },
-      fail: (err) => console.error(err),
+      fail: (err) => {
+        console.error("로그인 실패:", err);
+        // 토큰 에러 발생 시 사용자에게 인지시킴
+        if (JSON.stringify(err).includes("limit exceeded")) {
+           alert("⛔️ 잠시 로그인 제한이 걸렸습니다. 1시간 뒤에 다시 시도해주세요.");
+        }
+      },
     });
   };
 
-  // === 회원가입 완료 핸들러 (수정됨: 게스트 모드) ===
   const handleSignupComplete = async (formData) => {
     if (!pendingUser) return;
     try {
@@ -89,10 +134,7 @@ function App() {
             name: formData.name,            
             nickname: formData.name,        
             studentInfo: formData.studentInfo, 
-            
-            // 🔥 [수정됨] 가입 시 'guest'(비회원) 상태로 시작!
-            role: 'guest',                 
-            
+            role: 'guest', 
             remainingStars: 10,             
             reviewCount: 0,                 
             createdAt: serverTimestamp()
@@ -101,18 +143,18 @@ function App() {
         await setDoc(doc(db, "users", pendingUser.id), newUser);
         
         setUser({ id: pendingUser.id, ...newUser });
+        localStorage.setItem('userId', pendingUser.id);
         setPendingUser(null);
-        // 안내 메시지도 변경
-        alert(`환영합니다, ${formData.name}님! 가입 승인 대기 중입니다. (현재 비회원 상태)`);
+        alert(`환영합니다, ${formData.name}님! 가입 승인 대기 중입니다.`);
     } catch (e) {
         console.error("가입 실패:", e);
         alert("오류가 발생했습니다.");
     }
   };
 
-  const handleAddPlace = async () => { 
+  const handleAddPlace = async () => {
     if (!user) return alert("로그인이 필요한 기능입니다.");
-    if (user.role !== 'member') return alert("정회원만 가능합니다."); // 여기서 막힘
+    if (user.role !== 'member') return alert("정회원만 가능합니다.");
     if (!newPlaceName) return alert("식당 이름을 입력해주세요.");
 
     try {
@@ -147,7 +189,6 @@ function App() {
 
   const handleConfirmMove = async () => {
       if (!placeToMove || !moveTargetPos) return;
-      
       const confirmMove = window.confirm(`'${placeToMove.name}' 위치를 여기로 옮기시겠습니까?`);
       if (confirmMove) {
           try {
@@ -163,6 +204,23 @@ function App() {
               setMoveTargetPos(null);
           }
       }
+  };
+
+  const toggleAddMode = () => {
+    setIsAddMode(!isAddMode);
+    setNewPlacePos(null);
+    setSelectedPlace(null);
+    setIsMoveMode(false);
+    setMoveTargetPos(null);
+  };
+
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    setSelectedPlace(null);
+    setIsAddMode(false);
+    setNewPlacePos(null);
+    setIsMoveMode(false);
+    setMoveTargetPos(null);
   };
 
   useEffect(() => {
@@ -190,18 +248,14 @@ function App() {
              onPlaceClick={setSelectedPlace}
              tempMarkerPos={newPlacePos} 
              moveTargetPos={moveTargetPos}
-             
              onMapClick={(data) => { 
                if (isMoveMode) {
-                   console.log("이동 모드 클릭:", data);
                    setMoveTargetPos({ lat: data.lat, lng: data.lng });
                } else if (isAddMode) {
-                   console.log("추가 모드 클릭:", data);
                    setNewPlacePos({ lat: data.lat, lng: data.lng });
                    setNewPlaceLocation(data.detectedZone);
                    setSelectedPlace(null);
                } else {
-                   console.log("일반 모드 클릭 (상세창 닫기)");
                    setSelectedPlace(null);
                }
              }}
