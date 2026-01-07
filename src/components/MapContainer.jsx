@@ -138,26 +138,22 @@ const MapContainer = ({
     }
 
     filteredPlaces.forEach((place) => {
-      // 카공 필터일 때는 카공 색상 사용, 그 외에는 해당 카테고리 색상 사용
       const style = catFilter === "카공" 
           ? CATEGORY_STYLES["카공"] 
           : (CATEGORY_STYLES[place.category] || CATEGORY_STYLES["default"]);
       
-      // 🔥 [수정] 카공 카페인 경우 책 이모지 사용, 그 외에는 색깔 점 사용
-      let content = '';
+      // 🔥 [최적화] DOM 엘리먼트 직접 생성 방식으로 변경
+      const content = document.createElement('div');
       
       if (place.category === '카페' && place.isStudyFriendly) {
-          content = `
-            <div style="font-size: 24px; cursor: pointer; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); transform: translateY(-5px);" 
-                 onclick="window.dispatchEvent(new CustomEvent('markerClick', { detail: '${place.id}' }))">
-                📚
-            </div>`;
+          content.innerHTML = '📚';
+          content.style.cssText = 'font-size: 24px; cursor: pointer; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); transform: translateY(-5px);';
       } else {
-          content = `
-            <div style="width: 12px; height: 12px; background-color: ${style.color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;" 
-                 onclick="window.dispatchEvent(new CustomEvent('markerClick', { detail: '${place.id}' }))">
-            </div>`;
+          content.style.cssText = `width: 12px; height: 12px; background-color: ${style.color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;`;
       }
+
+      // 이벤트 리스너 직접 등록 (문자열 onclick 방식보다 안전하고 빠름)
+      content.onclick = () => onPlaceClick(place);
       
       const customOverlay = new window.kakao.maps.CustomOverlay({
         position: new window.kakao.maps.LatLng(place.lat, place.lng),
@@ -168,7 +164,7 @@ const MapContainer = ({
       customOverlay.setMap(mapRef.current);
       overlaysRef.current.push(customOverlay);
     });
-  }, [places, catFilter, isAddMode, isMoveMode]);
+  }, [places, catFilter, isAddMode, isMoveMode, onPlaceClick]); // onPlaceClick 의존성 추가
 
   // 5. 마커 클릭 리스너
   useEffect(() => {

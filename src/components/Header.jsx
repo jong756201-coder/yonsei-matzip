@@ -4,6 +4,7 @@ import { getAstroRank } from '../utils/rankHelper';
 
 const Header = ({ user, onLogin, places = [], onPlaceSelect }) => {
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [showGuide, setShowGuide] = useState(false); // 📍 [NEW] 가이드 모달 상태
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const inputRef = useRef(null);
@@ -88,16 +89,18 @@ const Header = ({ user, onLogin, places = [], onPlaceSelect }) => {
               </button>
             </div>
             
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              
+              {/* 도움말 버튼 (항상 보임) */}
+              <button 
+                onClick={() => setShowGuide(true)} 
+                style={{ background: 'none', border: 'none', color: '#888', padding: '4px', cursor: 'pointer', display: 'flex' }}
+              >
+                <HelpCircle size={20} />
+              </button>
+
               {user ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <button 
-                        onClick={() => alert("도움말: 지도를 클릭해 맛집을 등록하고, 별점을 남겨보세요! 🚀")} 
-                        style={{ background: 'none', border: 'none', color: '#888', padding: 0, cursor: 'pointer', display: 'flex' }}
-                      >
-                        <HelpCircle size={16} />
-                      </button>
-
                       {userRank && (
                           <span style={{ 
                               fontSize: '10px', 
@@ -106,7 +109,7 @@ const Header = ({ user, onLogin, places = [], onPlaceSelect }) => {
                               border: `1px solid ${userRank.color}`, 
                               padding: '2px 6px', 
                               borderRadius: '4px',
-                              backgroundColor: `${userRank.color}15`, // 아주 연한 배경색
+                              backgroundColor: `${userRank.color}15`, 
                               display: 'flex', alignItems: 'center', gap: '2px'
                           }} title={userRank.name}>
                               {userRank.emoji} {userRank.name.split(' ')[0]}
@@ -205,6 +208,76 @@ const Header = ({ user, onLogin, places = [], onPlaceSelect }) => {
           }}>
               검색 결과가 없습니다. 🛰️
           </div>
+      )}
+
+      {/* 📚 가이드 모달 */}
+      {showGuide && (
+        <div style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 10000, 
+            display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' 
+        }} onClick={() => setShowGuide(false)}>
+            <div 
+                onClick={(e) => e.stopPropagation()}
+                style={{ 
+                    backgroundColor: '#1a1a1a', width: '100%', maxWidth: '320px', 
+                    borderRadius: '24px', padding: '30px', border: '1px solid #333', 
+                    position: 'relative', boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+                }}
+            >
+                <button onClick={() => setShowGuide(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}><X /></button>
+                
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <HelpCircle size={24} color="#3b82f6" /> 이용 가이드
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#252525', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>📊</div>
+                        <div>
+                            <div style={{ color: '#FFD700', fontWeight: 'bold', marginBottom: '4px' }}>평점 시스템</div>
+                            <div style={{ color: '#ccc', fontSize: '13px', lineHeight: '1.5' }}>
+                                평점은 <span style={{ color: '#fff', fontWeight: 'bold' }}>-2점</span>부터 <span style={{ color: '#fff', fontWeight: 'bold' }}>3점</span>까지 부여할 수 있습니다.<br/>
+                                <span style={{ color: '#888', fontSize: '12px' }}>* 0점이 '보통' 기준입니다.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#252525', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>⭐</div>
+                        <div>
+                            <div style={{ color: '#FFD700', fontWeight: 'bold', marginBottom: '4px' }}>별(Star) 소모 규칙</div>
+                            <div style={{ color: '#ccc', fontSize: '13px', lineHeight: '1.5' }}>
+                                최고의 맛집(명예점수)으로 선정할 때<br/>
+                                <span style={{ color: '#fff', fontWeight: 'bold' }}>3점 이상</span>을 주면 보유한 <span style={{ color: '#FFD700' }}>별이 소모</span>됩니다.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#252525', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>📍</div>
+                        <div>
+                            <div style={{ color: '#3b82f6', fontWeight: 'bold', marginBottom: '4px' }}>맛집 등록</div>
+                            <div style={{ color: '#ccc', fontSize: '13px', lineHeight: '1.5' }}>
+                                지도 빈 곳을 클릭하여 나만의 맛집을<br/>등록하고 공유해보세요!
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <button 
+                    onClick={() => setShowGuide(false)}
+                    style={{ 
+                        marginTop: '30px', width: '100%', padding: '14px', borderRadius: '12px', 
+                        backgroundColor: '#333', border: 'none', color: 'white', fontWeight: 'bold', cursor: 'pointer' 
+                    }}
+                >
+                    확인했어요!
+                </button>
+            </div>
+        </div>
       )}
     </>
   );
